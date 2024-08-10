@@ -3,7 +3,6 @@ package com.brinvex.util.dms.impl;
 import com.brinvex.util.dms.api.DmsService;
 import com.brinvex.util.dms.api.DmsServiceFactory;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ public class DmsTest {
     static void beforeAll() throws IOException {
         Path basePath = Path.of("c:/prj/bx-util/bx-util-dms/test-data/");
         hardDeleteOldTestWorkspaces(basePath);
-        dmsServiceFactory = DmsServiceFactory.getNewFilesystemDmsServiceFactory(basePath);
+        dmsServiceFactory = DmsServiceFactory.createFilesystemDmsServiceFactory(basePath);
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
