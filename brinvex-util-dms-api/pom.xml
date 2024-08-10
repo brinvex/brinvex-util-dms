@@ -12,7 +12,7 @@
     <artifactId>brinvex-util-dms-api</artifactId>
     <name>Brinvex-Util-DMS - Api</name>
     <description>
-        Brinvex-Util-DMS is a very simple and minimalistic Document Management System.
+        Brinvex-Util-DMS is a simple and minimalistic Document Management System.
     </description>
 
 </project>
