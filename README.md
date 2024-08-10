@@ -22,6 +22,37 @@ The interface supports both soft and hard deletion of documents, allowing for fl
     - **Soft Deletion:** Marks documents for deletion without immediately removing them.
     - **Hard Deletion:** Permanently removes documents, either individually or in bulk.
 
+### Example
+````
+DmsServiceFactory dmsServiceFactory = DmsServiceFactory.getNewFilesystemDmsServiceFactory(Path.of("c:/tmp"));
+DmsService dmsService = dmsServiceFactory.getDmsService("workspace1");
+
+// Add a text document
+dmsService.add("/docs", "example.txt", "Hello, World!");
+
+// Check if the document exists
+boolean exists = dmsService.exists("/docs", "example.txt");
+
+// Add a new or override an existing document
+dmsService.put("/docs", "example.txt", "Hello!");
+
+// Retrieve the text content
+if (exists) {
+    String content = dmsService.getTextContent("/docs", "example.txt");
+    System.out.println("Document Content: " + content);
+}
+
+// Soft delete the document
+dmsService.softDelete("/docs", "example.txt");
+
+// Hard delete the document
+dmsService.hardDelete("/docs", "example.txt");
+
+// Clean up all soft-deleted documents in a directory
+int deletedCount = dmsService.hardDeleteAllSoftDeleted("/docs");
+System.out.println("Deleted " + deletedCount + " soft-deleted documents.");
+
+````
 
 ### Maven dependency declaration
 To use _Brinvex-Util-DMS_ in your Maven project, declare the following dependency in your project's pom file. 
