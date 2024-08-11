@@ -7,18 +7,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -26,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 public class DmsTest {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DmsTest.class);
 
     private static final DateTimeFormatter workspaceDtf = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
 
@@ -36,33 +35,17 @@ public class DmsTest {
     @BeforeAll
     static void beforeAll() throws IOException {
         Path basePath = Path.of("c:/prj/bx-util/bx-util-dms/test-data/");
-        hardDeleteOldTestWorkspaces(basePath);
         dmsServiceFactory = DmsServiceFactory.createFilesystemDmsServiceFactory(basePath);
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private static void hardDeleteOldTestWorkspaces(Path basePath) throws IOException {
-        try (Stream<Path> oldWorkspaces = Files.list(basePath)) {
-            oldWorkspaces
-                    .filter(ws -> ws.getFileName().toString().startsWith("_DELETED_"))
-                    .forEach(ws -> {
-                        try (Stream<Path> wsChildStream = Files.walk(ws)) {
-                            wsChildStream
-                                    .sorted(Comparator.reverseOrder())
-                                    .map(Path::toFile)
-                                    .peek(f -> System.out.println("Deleting: " + f))
-                                    .forEach(File::delete);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
-        }
     }
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
-        String workspace = testInfo.getDisplayName() + LocalDateTime.now().format(workspaceDtf);
+        LocalDateTime now = LocalDateTime.now();
+        String testName = testInfo.getDisplayName();
+        String workspace = testName + now.format(workspaceDtf);
         dmsService = dmsServiceFactory.getDmsService(workspace);
+        LOG.info("setUp {} - invoking dmsService.hardDeleteSoftDeletedWorkspace({})", testName, now);
+        dmsService.hardDeleteSoftDeletedWorkspace(now);
     }
 
     @AfterEach

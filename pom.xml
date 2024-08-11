@@ -6,7 +6,7 @@
 
     <groupId>com.brinvex.util</groupId>
     <artifactId>brinvex-util-dms</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <packaging>pom</packaging>
 
     <name>Brinvex-Util-DMS</name>
@@ -53,6 +53,9 @@
         <maven.compiler.showDeprecation>true</maven.compiler.showDeprecation>
         <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
 
+        <slf4j.version>2.0.13</slf4j.version>
+        <logback.version>1.5.6</logback.version>
+
         <junit-jupiter.version>5.9.1</junit-jupiter.version>
 
         <rootDir>${project.basedir}</rootDir>
@@ -68,6 +71,17 @@
                 <groupId>com.brinvex.util</groupId>
                 <artifactId>brinvex-util-dms-api</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
             </dependency>
 
             <dependency>

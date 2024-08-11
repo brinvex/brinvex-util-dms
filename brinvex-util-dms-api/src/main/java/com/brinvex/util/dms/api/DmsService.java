@@ -176,7 +176,12 @@ public interface DmsService {
 
     /**
      * Soft deletes the entire workspace. After invoking this method, no other methods
-     * in this interface should be invoked, as the workspace is marked for deletion.
+     * except hardDeleteSoftDeletedWorkspace should be invoked, as the workspace is marked for deletion.
      */
     void softDeleteWorkspace();
+
+    /**
+     * Hard deletes the previously soft-deleted workspace.
+     */
+    int hardDeleteSoftDeletedWorkspace(LocalDateTime softDeletedBefore);
 }

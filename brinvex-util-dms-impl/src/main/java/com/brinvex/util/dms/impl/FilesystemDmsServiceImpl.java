@@ -1,6 +1,8 @@
 package com.brinvex.util.dms.impl;
 
 import com.brinvex.util.dms.api.DmsService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -11,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -20,6 +23,7 @@ import java.util.stream.Stream;
 @SuppressWarnings("DuplicatedCode")
 public class FilesystemDmsServiceImpl implements DmsService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(FilesystemDmsServiceImpl.class);
 
     private final String workspace;
 
@@ -274,6 +278,7 @@ public class FilesystemDmsServiceImpl implements DmsService {
         }
         for (Path fileToHardDelete : filesToHardDelete) {
             try {
+                LOG.info("Hard deleting: {}", fileToHardDelete);
                 Files.delete(fileToHardDelete);
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to delete: %s".formatted(fileToHardDelete), e);
@@ -292,6 +297,34 @@ public class FilesystemDmsServiceImpl implements DmsService {
             throw new UncheckedIOException("Failed to move %s -> %s".formatted(workspacePath, newSoftDelWorkspacePath), e);
         }
         workspaceDeleted = true;
+    }
+
+    @Override
+    public int hardDeleteSoftDeletedWorkspace(LocalDateTime softDeletedBefore) {
+        try (Stream<Path> workspaces = Files.list(workspacePath.getParent())) {
+            List<Path> softDeletedWorkspaces = workspaces
+                    .filter(ws -> SoftDeleteHelper.isSoftDeleted(ws.getFileName().toString(), null, softDeletedBefore))
+                    .toList();
+            for (Path softDeletedWorkspace : softDeletedWorkspaces) {
+                try (Stream<Path> wsChildStream = Files.walk(softDeletedWorkspace)) {
+                    wsChildStream
+                            .sorted(Comparator.reverseOrder())
+                            .peek(f -> LOG.info("Recursively hard-deleting: {} ", f))
+                            .forEach(path -> {
+                                try {
+                                    Files.delete(path);
+                                } catch (IOException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            });
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return softDeletedWorkspaces.size();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private Path getOrCreateDirectory(String directory) {

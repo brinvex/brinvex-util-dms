@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.brinvex.util</groupId>
         <artifactId>brinvex-util-dms</artifactId>
-        <version>1.0.0</version>
+        <version>1.0.1</version>
     </parent>
 
     <artifactId>brinvex-util-dms-impl</artifactId>
@@ -27,6 +27,16 @@
             <artifactId>brinvex-util-dms-api</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
