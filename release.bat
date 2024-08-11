@@ -1,7 +1,7 @@
 set JAVA_HOME="C:\tools\java\jdk-21.0.1"
 
 REM Dont forget to update version in README
-set new_version=1.0.1
+set new_version=1.0.4
 
 call mvnw clean package
 

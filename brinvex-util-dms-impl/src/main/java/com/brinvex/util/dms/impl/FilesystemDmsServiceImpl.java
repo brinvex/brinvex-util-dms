@@ -29,8 +29,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     private final Path workspacePath;
 
-    private boolean workspaceDeleted = false;
-
     @SuppressWarnings("SpellCheckingInspection")
     private static class SoftDeleteHelper {
         private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
@@ -94,7 +92,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void add(String directory, String key, String textContent, Charset charset) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
@@ -111,7 +108,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void add(String directory, String key, byte[] binaryContent) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
@@ -128,7 +124,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void put(String directory, String key, String textContent, Charset charset) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
@@ -142,7 +137,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void put(String directory, String key, byte[] binaryContent) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
@@ -156,7 +150,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public boolean exists(String directory, String key) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = workspacePath.resolve(directory);
@@ -170,7 +163,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public Collection<String> getKeys(String directory) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         Path directoryPath = workspacePath.resolve(directory);
         if (!Files.exists(directoryPath)) {
@@ -191,7 +183,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public String getTextContent(String directory, String key, Charset charset) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path filePath = workspacePath.resolve(directory).resolve(key);
@@ -207,7 +198,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public byte[] getBinaryContent(String directory, String key) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path filePath = workspacePath.resolve(directory).resolve(key);
@@ -223,7 +213,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void softDelete(String directory, String key) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path filePath = workspacePath.resolve(directory).resolve(key);
@@ -240,7 +229,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public void hardDelete(String directory, String key) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = workspacePath.resolve(directory);
@@ -257,7 +245,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
 
     @Override
     public int hardDeleteAllSoftDeleted(String directory, String origKey, LocalDateTime softDeletedBefore) {
-        validateWorkspaceIsNotDeleted();
         validateDirectorySyntax(directory);
         if (origKey != null) {
             validateKeySyntax(origKey);
@@ -288,15 +275,14 @@ public class FilesystemDmsServiceImpl implements DmsService {
     }
 
     @Override
-    public void softDeleteWorkspace() {
-        validateWorkspaceIsNotDeleted();
+    public void softDeleteAndResetWorkspace() {
         Path newSoftDelWorkspacePath = SoftDeleteHelper.contructSoftDeletedPath(workspacePath, LocalDateTime.now());
         try {
             Files.move(workspacePath, newSoftDelWorkspacePath);
+            Files.createDirectory(workspacePath);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to move %s -> %s".formatted(workspacePath, newSoftDelWorkspacePath), e);
         }
-        workspaceDeleted = true;
     }
 
     @Override
@@ -339,12 +325,6 @@ public class FilesystemDmsServiceImpl implements DmsService {
             throw new IllegalArgumentException("Not a directory: %s, workspace=%s".formatted(directoryPath, workspace));
         }
         return directoryPath;
-    }
-
-    private void validateWorkspaceIsNotDeleted() {
-        if (workspaceDeleted) {
-            throw new IllegalStateException("Workspace already deleted: %s".formatted(workspace));
-        }
     }
 
     private void validateWorkspaceSyntax(String workspaceName) {

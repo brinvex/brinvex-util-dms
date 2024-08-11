@@ -33,24 +33,19 @@ public class DmsTest {
     private DmsService dmsService;
 
     @BeforeAll
-    static void beforeAll() throws IOException {
+    static void beforeAll() {
         Path basePath = Path.of("c:/prj/bx-util/bx-util-dms/test-data/");
         dmsServiceFactory = DmsServiceFactory.createFilesystemDmsServiceFactory(basePath);
     }
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
-        LocalDateTime now = LocalDateTime.now();
         String testName = testInfo.getDisplayName();
-        String workspace = testName + now.format(workspaceDtf);
-        dmsService = dmsServiceFactory.getDmsService(workspace);
+        dmsService = dmsServiceFactory.getDmsService(testName);
+        dmsService.softDeleteAndResetWorkspace();
+        LocalDateTime now = LocalDateTime.now();
         LOG.info("setUp {} - invoking dmsService.hardDeleteSoftDeletedWorkspace({})", testName, now);
         dmsService.hardDeleteSoftDeletedWorkspace(now);
-    }
-
-    @AfterEach
-    void tearDown() {
-        dmsService.softDeleteWorkspace();
     }
 
     @Test
