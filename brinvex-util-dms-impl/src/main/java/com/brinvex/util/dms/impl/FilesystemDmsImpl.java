@@ -1,6 +1,6 @@
 package com.brinvex.util.dms.impl;
 
-import com.brinvex.util.dms.api.DmsService;
+import com.brinvex.util.dms.api.Dms;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,42 +21,64 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @SuppressWarnings("DuplicatedCode")
-public class FilesystemDmsServiceImpl implements DmsService {
+public class FilesystemDmsImpl implements Dms {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FilesystemDmsServiceImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FilesystemDmsImpl.class);
 
     private final String workspace;
 
     private final Path workspacePath;
 
+    private boolean workspaceDeleted;
+
+    private interface IOConsumer<I> {
+        void accept(I input) throws IOException;
+    }
+
+    private interface IOFunction<I, O> {
+        O apply(I input) throws IOException;
+    }
+
     @SuppressWarnings("SpellCheckingInspection")
     private static class SoftDeleteHelper {
         private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
-        private static final Pattern softDelPrefixPattern = Pattern.compile("^_DELETED_(\\d{8}_\\d{6}_\\d{3})_!@#-$");
-        private static final int softDelPrefixPatternLength = "_DELETED_yyyyMMdd_HHmmss_SSS_!@#-".length();
+        private static final Pattern deletedPrefixPattern = Pattern.compile("^_DEL_(\\d{8}_\\d{6}_\\d{3})_!@#-$");
+        private static final Pattern overriddenPrefixPattern = Pattern.compile("^_OVR_(\\d{8}_\\d{6}_\\d{3})_!@#-$");
+        private static final int deletedPrefixLength = "_DEL_yyyyMMdd_HHmmss_SSS_!@#-".length();
+        private static final int overriddenPrefixLength = "_OVR_yyyyMMdd_HHmmss_SSS_!@#-".length();
 
         private static Path contructSoftDeletedPath(Path oldPath, LocalDateTime timestamp) {
-            String softDelPrefix = "_DELETED_" + dtf.format(timestamp) + "_!@#-";
-            return oldPath.getParent().resolve(softDelPrefix + oldPath.getFileName());
+            String prefix = "_DEL_" + dtf.format(timestamp) + "_!@#-";
+            return oldPath.getParent().resolve(prefix + oldPath.getFileName());
         }
 
-        private static boolean isSoftDeleted(String filename, String origKey, LocalDateTime softDeletedBefore) {
+        private static Path contructOverriddenPath(Path oldPath, LocalDateTime timestamp) {
+            String prefix = "_OVR_" + dtf.format(timestamp) + "_!@#-";
+            return oldPath.getParent().resolve(prefix + oldPath.getFileName());
+        }
+
+        private static boolean isObsolete(String filename, String origKey, LocalDateTime obsoleteBefore) {
             int filenameLength = filename.length();
-            if (filenameLength <= softDelPrefixPatternLength) {
+            if (filenameLength <= deletedPrefixLength) {
                 return false;
             }
-            String left = filename.substring(0, softDelPrefixPatternLength);
+            String left = filename.substring(0, deletedPrefixLength);
             boolean result = true;
             if (origKey != null) {
-                String right = filename.substring(softDelPrefixPatternLength);
+                String right = filename.substring(deletedPrefixLength);
                 result = right.equals(origKey);
             }
             if (result) {
-                Matcher m = softDelPrefixPattern.matcher(left);
-                if (m.find()) {
-                    if (softDeletedBefore != null) {
-                        LocalDateTime softDelDate = LocalDateTime.parse(m.group(1), dtf);
-                        result = softDelDate.isBefore(softDeletedBefore);
+                Matcher m;
+                if ((m = deletedPrefixPattern.matcher(left)).find()) {
+                    if (obsoleteBefore != null) {
+                        LocalDateTime delDate = LocalDateTime.parse(m.group(1), dtf);
+                        result = delDate.isBefore(obsoleteBefore);
+                    }
+                } else if ((m = overriddenPrefixPattern.matcher(left)).find()) {
+                    if (obsoleteBefore != null) {
+                        LocalDateTime ovrDate = LocalDateTime.parse(m.group(1), dtf);
+                        result = ovrDate.isBefore(obsoleteBefore);
                     }
                 } else {
                     result = false;
@@ -65,17 +87,17 @@ public class FilesystemDmsServiceImpl implements DmsService {
             return result;
         }
 
-        private static boolean isSoftDeleted(String filename) {
+        private static boolean isObsolete(String filename) {
             int filenameLength = filename.length();
-            if (filenameLength <= softDelPrefixPatternLength) {
+            if (filenameLength <= deletedPrefixLength) {
                 return false;
             }
-            String left = filename.substring(0, softDelPrefixPatternLength);
-            return softDelPrefixPattern.matcher(left).matches();
+            String left = filename.substring(0, deletedPrefixLength);
+            return deletedPrefixPattern.matcher(left).matches();
         }
     }
 
-    public FilesystemDmsServiceImpl(Path basePath, String workspace) {
+    public FilesystemDmsImpl(Path basePath, String workspace) {
         validateWorkspaceSyntax(workspace);
         this.workspace = workspace;
         this.workspacePath = basePath.resolve(workspace);
@@ -88,68 +110,93 @@ public class FilesystemDmsServiceImpl implements DmsService {
         } else if (!Files.isDirectory(workspacePath)) {
             throw new IllegalArgumentException("Workspace is not a directory: %s".formatted(workspace));
         }
+        this.workspaceDeleted = false;
+    }
+
+    @Override
+    public Collection<String> getKeys(String directory) {
+        validateWorkspaceNotDeleted();
+        validateDirectorySyntax(directory);
+        Path directoryPath = workspacePath.resolve(directory);
+        if (!Files.exists(directoryPath)) {
+            return Collections.emptyList();
+        } else if (!Files.isDirectory(directoryPath)) {
+            throw new IllegalArgumentException("Not a directory: %s, workspace=%s".formatted(directoryPath, workspace));
+        }
+        try (Stream<Path> fileStream = Files.list(directoryPath)) {
+            return fileStream
+                    .map(Path::getFileName)
+                    .map(Path::toString)
+                    .filter(Predicate.not(SoftDeleteHelper::isObsolete))
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to list files at path: %s".formatted(directoryPath), e);
+        }
     }
 
     @Override
     public void add(String directory, String key, String textContent, Charset charset) {
-        validateDirectorySyntax(directory);
-        validateKeySyntax(key);
-        Path directoryPath = getOrCreateDirectory(directory);
-        Path filePath = directoryPath.resolve(key);
-        if (Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document already exists: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
-        }
-        try {
-            Files.writeString(filePath, textContent, charset);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to write to the file: %s".formatted(filePath), e);
-        }
+        add(directory, key, path -> Files.writeString(path, textContent, charset));
     }
 
     @Override
     public void add(String directory, String key, byte[] binaryContent) {
+        add(directory, key, path -> Files.write(path, binaryContent));
+    }
+
+    private void add(String directory, String key, IOConsumer<Path> fileWriter) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
         Path filePath = directoryPath.resolve(key);
         if (Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document already exists: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
+            throw new IllegalArgumentException("Document already exists: workspace='%s', directory='%s', key='%s'"
+                    .formatted(workspace, directory, key));
         }
         try {
-            Files.write(filePath, binaryContent);
+            fileWriter.accept(filePath);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write to the file: %s".formatted(filePath), e);
         }
     }
 
     @Override
-    public void put(String directory, String key, String textContent, Charset charset) {
-        validateDirectorySyntax(directory);
-        validateKeySyntax(key);
-        Path directoryPath = getOrCreateDirectory(directory);
-        Path filePath = directoryPath.resolve(key);
-        try {
-            Files.writeString(filePath, textContent, charset);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to write to the file: %s".formatted(filePath), e);
-        }
+    public boolean put(String directory, String key, String textContent, Charset charset) {
+        return put(directory, key, path -> Files.writeString(path, textContent, charset));
     }
 
     @Override
-    public void put(String directory, String key, byte[] binaryContent) {
+    public boolean put(String directory, String key, byte[] binaryContent) {
+        return put(directory, key, path -> Files.write(path, binaryContent));
+    }
+
+    private boolean put(String directory, String key, IOConsumer<Path> fileWriter) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = getOrCreateDirectory(directory);
         Path filePath = directoryPath.resolve(key);
+        boolean isNew = !Files.exists(filePath);
+        if (!isNew) {
+            Path overriddenPath = SoftDeleteHelper.contructOverriddenPath(filePath, LocalDateTime.now());
+            try {
+                Files.move(filePath, overriddenPath);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to move %s -> %s".formatted(filePath, overriddenPath), e);
+            }
+        }
         try {
-            Files.write(filePath, binaryContent);
+            fileWriter.accept(filePath);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write to the file: %s".formatted(filePath), e);
         }
+        return isNew;
     }
 
     @Override
     public boolean exists(String directory, String key) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path directoryPath = workspacePath.resolve(directory);
@@ -162,42 +209,17 @@ public class FilesystemDmsServiceImpl implements DmsService {
     }
 
     @Override
-    public Collection<String> getKeys(String directory) {
-        validateDirectorySyntax(directory);
-        Path directoryPath = workspacePath.resolve(directory);
-        if (!Files.exists(directoryPath)) {
-            return Collections.emptyList();
-        } else if (!Files.isDirectory(directoryPath)) {
-            throw new IllegalArgumentException("Not a directory: %s, workspace=%s".formatted(directoryPath, workspace));
-        }
-        try (Stream<Path> fileStream = Files.list(directoryPath)) {
-            return fileStream
-                    .map(Path::getFileName)
-                    .map(Path::toString)
-                    .filter(Predicate.not(SoftDeleteHelper::isSoftDeleted))
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to list files at path: %s".formatted(directoryPath), e);
-        }
-    }
-
-    @Override
     public String getTextContent(String directory, String key, Charset charset) {
-        validateDirectorySyntax(directory);
-        validateKeySyntax(key);
-        Path filePath = workspacePath.resolve(directory).resolve(key);
-        if (!Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
-        }
-        try {
-            return Files.readString(filePath, charset);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to read the file %s".formatted(filePath), e);
-        }
+        return getContent(directory, key, Files::readString);
     }
 
     @Override
     public byte[] getBinaryContent(String directory, String key) {
+        return getContent(directory, key, Files::readAllBytes);
+    }
+
+    private <CONTENT> CONTENT getContent(String directory, String key, IOFunction<Path, CONTENT> fileReader) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path filePath = workspacePath.resolve(directory).resolve(key);
@@ -205,19 +227,21 @@ public class FilesystemDmsServiceImpl implements DmsService {
             throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
         }
         try {
-            return Files.readAllBytes(filePath);
+            return fileReader.apply(filePath);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read the file %s".formatted(filePath), e);
         }
     }
 
     @Override
-    public void softDelete(String directory, String key) {
+    public void delete(String directory, String key) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         validateKeySyntax(key);
         Path filePath = workspacePath.resolve(directory).resolve(key);
         if (!Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
+            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'"
+                    .formatted(workspace, directory, key));
         }
         Path newSoftDelPath = SoftDeleteHelper.contructSoftDeletedPath(filePath, LocalDateTime.now());
         try {
@@ -228,23 +252,8 @@ public class FilesystemDmsServiceImpl implements DmsService {
     }
 
     @Override
-    public void hardDelete(String directory, String key) {
-        validateDirectorySyntax(directory);
-        validateKeySyntax(key);
-        Path directoryPath = workspacePath.resolve(directory);
-        Path filePath = directoryPath.resolve(key);
-        if (!Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
-        }
-        try {
-            Files.delete(filePath);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to delete %s".formatted(filePath), e);
-        }
-    }
-
-    @Override
-    public int hardDeleteAllSoftDeleted(String directory, String origKey, LocalDateTime softDeletedBefore) {
+    public int purge(String directory, String origKey, LocalDateTime softDeletedBefore) {
+        validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         if (origKey != null) {
             validateKeySyntax(origKey);
@@ -258,7 +267,7 @@ public class FilesystemDmsServiceImpl implements DmsService {
         List<Path> filesToHardDelete;
         try (Stream<Path> fileStream = Files.list(directoryPath)) {
             filesToHardDelete = fileStream
-                    .filter(p -> SoftDeleteHelper.isSoftDeleted(p.getFileName().toString(), origKey, softDeletedBefore))
+                    .filter(p -> SoftDeleteHelper.isObsolete(p.getFileName().toString(), origKey, softDeletedBefore))
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to list files at path: %s".formatted(directoryPath), e);
@@ -275,24 +284,38 @@ public class FilesystemDmsServiceImpl implements DmsService {
     }
 
     @Override
-    public void softDeleteAndResetWorkspace() {
-        Path newSoftDelWorkspacePath = SoftDeleteHelper.contructSoftDeletedPath(workspacePath, LocalDateTime.now());
+    public void resetWorkspace() {
+        if (!workspaceDeleted) {
+            deleteWorkspace();
+        }
         try {
-            Files.move(workspacePath, newSoftDelWorkspacePath);
             Files.createDirectory(workspacePath);
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to move %s -> %s".formatted(workspacePath, newSoftDelWorkspacePath), e);
+            throw new UncheckedIOException("Failed to init workspace %s".formatted(workspacePath), e);
         }
+        workspaceDeleted = false;
     }
 
     @Override
-    public int hardDeleteSoftDeletedWorkspace(LocalDateTime softDeletedBefore) {
+    public void deleteWorkspace() {
+        validateWorkspaceNotDeleted();
+        Path newSoftDelWorkspacePath = SoftDeleteHelper.contructSoftDeletedPath(workspacePath, LocalDateTime.now());
+        try {
+            Files.move(workspacePath, newSoftDelWorkspacePath);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to move %s -> %s".formatted(workspacePath, newSoftDelWorkspacePath), e);
+        }
+        workspaceDeleted = true;
+    }
+
+    @Override
+    public int purgeWorkspace(LocalDateTime softDeletedBefore) {
         try (Stream<Path> workspaces = Files.list(workspacePath.getParent())) {
-            List<Path> softDeletedWorkspaces = workspaces
-                    .filter(ws -> SoftDeleteHelper.isSoftDeleted(ws.getFileName().toString(), null, softDeletedBefore))
+            List<Path> obsoleteWorkspaceVersions = workspaces
+                    .filter(ws -> SoftDeleteHelper.isObsolete(ws.getFileName().toString(), workspace, softDeletedBefore))
                     .toList();
-            for (Path softDeletedWorkspace : softDeletedWorkspaces) {
-                try (Stream<Path> wsChildStream = Files.walk(softDeletedWorkspace)) {
+            for (Path obsoleteWorkspaceVersion : obsoleteWorkspaceVersions) {
+                try (Stream<Path> wsChildStream = Files.walk(obsoleteWorkspaceVersion)) {
                     wsChildStream
                             .sorted(Comparator.reverseOrder())
                             .peek(f -> LOG.info("Recursively hard-deleting: {} ", f))
@@ -307,7 +330,7 @@ public class FilesystemDmsServiceImpl implements DmsService {
                     throw new UncheckedIOException(e);
                 }
             }
-            return softDeletedWorkspaces.size();
+            return obsoleteWorkspaceVersions.size();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -325,6 +348,12 @@ public class FilesystemDmsServiceImpl implements DmsService {
             throw new IllegalArgumentException("Not a directory: %s, workspace=%s".formatted(directoryPath, workspace));
         }
         return directoryPath;
+    }
+
+    private void validateWorkspaceNotDeleted() {
+        if (workspaceDeleted) {
+            throw new IllegalStateException("Workspace already deleted - '%s'".formatted(workspace));
+        }
     }
 
     private void validateWorkspaceSyntax(String workspaceName) {

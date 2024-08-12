@@ -3,13 +3,13 @@ package com.brinvex.util.dms.api;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 
-public interface DmsServiceFactory {
+public interface DmsFactory {
 
-    DmsService getDmsService(String workspace);
+    Dms getDms(String workspace);
 
-    static DmsServiceFactory createFilesystemDmsServiceFactory(Path basePath) {
+    static DmsFactory createFilesystemDmsFactory(Path basePath) {
         try {
-            return (DmsServiceFactory) Class.forName("com.brinvex.util.dms.impl.FilesystemDmsServiceFactoryImpl")
+            return (DmsFactory) Class.forName("com.brinvex.util.dms.impl.FilesystemDmsFactoryImpl")
                     .getConstructor(Path.class)
                     .newInstance(basePath);
         } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {

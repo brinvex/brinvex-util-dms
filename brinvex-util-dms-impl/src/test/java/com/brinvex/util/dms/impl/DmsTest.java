@@ -1,8 +1,7 @@
 package com.brinvex.util.dms.impl;
 
-import com.brinvex.util.dms.api.DmsService;
-import com.brinvex.util.dms.api.DmsServiceFactory;
-import org.junit.jupiter.api.AfterEach;
+import com.brinvex.util.dms.api.Dms;
+import com.brinvex.util.dms.api.DmsFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -28,29 +26,30 @@ public class DmsTest {
 
     private static final DateTimeFormatter workspaceDtf = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
 
-    private static DmsServiceFactory dmsServiceFactory;
+    private static DmsFactory dmsFactory;
 
-    private DmsService dmsService;
+    private Dms dms;
 
     @BeforeAll
     static void beforeAll() {
         Path basePath = Path.of("c:/prj/bx-util/bx-util-dms/test-data/");
-        dmsServiceFactory = DmsServiceFactory.createFilesystemDmsServiceFactory(basePath);
+        dmsFactory = DmsFactory.createFilesystemDmsFactory(basePath);
     }
 
     @BeforeEach
     void setUp(TestInfo testInfo) {
         String testName = testInfo.getDisplayName();
-        dmsService = dmsServiceFactory.getDmsService(testName);
-        dmsService.softDeleteAndResetWorkspace();
+        dms = dmsFactory.getDms(testName);
+        dms.resetWorkspace();
         LocalDateTime now = LocalDateTime.now();
-        LOG.info("setUp {} - invoking dmsService.hardDeleteSoftDeletedWorkspace({})", testName, now);
-        dmsService.hardDeleteSoftDeletedWorkspace(now);
+        LOG.info("setUp {} - invoking dms.purgeWorkspace({})", testName, now);
+        int purged = dms.purgeWorkspace(now);
+        LOG.info("setUp {} - purged={}", testName, purged);
     }
 
     @Test
     void fileKeys_empty() {
-        Collection<String> fileKeys = dmsService.getKeys("some/directory");
+        Collection<String> fileKeys = dms.getKeys("some/directory");
         assertTrue(fileKeys.isEmpty());
     }
 
@@ -60,27 +59,59 @@ public class DmsTest {
         String directory = "some/directory";
         String key = "some_key";
 
-        dmsService.add(directory, key, content1);
-        Collection<String> fileKeys = dmsService.getKeys(directory);
+        dms.add(directory, key, content1);
+        Collection<String> fileKeys = dms.getKeys(directory);
         assertEquals(1, fileKeys.size());
         assertTrue(fileKeys.contains(key));
 
-        boolean exists = dmsService.exists(directory, key);
+        boolean exists = dms.exists(directory, key);
         assertTrue(exists);
 
-        String content2 = dmsService.getTextContent(directory, key);
+        String content2 = dms.getTextContent(directory, key);
         assertEquals(content1, content2);
     }
 
     @Test
     void add_duplicate() {
-        dmsService.add("some/directory", "some_key", "some_value1");
+        dms.add("some/directory", "some_key", "some_value1");
         try {
-            dmsService.add("some/directory", "some_key", "some_value2");
+            dms.add("some/directory", "some_key", "some_value2");
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
     }
+
+    @Test
+    void put() {
+        boolean added;
+        String directory = "some/directory";
+        String key = "some_key";
+        added = dms.put(directory, key, "some_value1");
+        assertTrue(added);
+
+        added = dms.put(directory, key, "some_value1");
+        assertFalse(added);
+
+        dms.delete(directory, key);
+        added = dms.put(directory, key, "some_value1");
+        assertTrue(added);
+
+        dms.delete(directory, key);
+        added = dms.put(directory, key, "some_value1");
+        assertTrue(added);
+
+        added = dms.put(directory, key, "some_value1");
+        assertFalse(added);
+
+        int purged;
+        purged = dms.purge(directory);
+        assertEquals(4, purged);
+        purged = dms.purge(directory);
+        assertEquals(0, purged);
+
+
+    }
+
 
     @Test
     void softDelete() {
@@ -88,34 +119,29 @@ public class DmsTest {
         String directory = "some/directory";
         String key = "some_key";
 
-        dmsService.add(directory, key, content1);
-        Collection<String> fileKeys = dmsService.getKeys(directory);
+        dms.add(directory, key, content1);
+        Collection<String> fileKeys = dms.getKeys(directory);
         assertEquals(1, fileKeys.size());
         assertTrue(fileKeys.contains(key));
 
-        boolean exists = dmsService.exists(directory, key);
+        boolean exists = dms.exists(directory, key);
         assertTrue(exists);
 
-        String content2 = dmsService.getTextContent(directory, key);
+        String content2 = dms.getTextContent(directory, key);
         assertEquals(content1, content2);
 
-        dmsService.softDelete(directory, key);
+        dms.delete(directory, key);
 
-        boolean exists2 = dmsService.exists(directory, key);
+        boolean exists2 = dms.exists(directory, key);
         assertFalse(exists2);
 
         try {
-            dmsService.softDelete(directory, key);
+            dms.delete(directory, key);
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
         try {
-            dmsService.getTextContent(directory, key);
-            fail("Should fail");
-        } catch (IllegalArgumentException expected) {
-        }
-        try {
-            dmsService.hardDelete(directory, key);
+            dms.getTextContent(directory, key);
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
@@ -127,34 +153,36 @@ public class DmsTest {
         String directory = "some/directory";
         String key = "some_key";
 
-        dmsService.add(directory, key, content1);
-        Collection<String> fileKeys = dmsService.getKeys(directory);
+        dms.add(directory, key, content1);
+        Collection<String> fileKeys = dms.getKeys(directory);
         assertEquals(1, fileKeys.size());
         assertTrue(fileKeys.contains(key));
 
-        boolean exists = dmsService.exists(directory, key);
+        boolean exists = dms.exists(directory, key);
         assertTrue(exists);
 
-        String content2 = dmsService.getTextContent(directory, key);
+        String content2 = dms.getTextContent(directory, key);
         assertEquals(content1, content2);
 
-        dmsService.hardDelete(directory, key);
+        dms.delete(directory, key);
+        dms.purge(directory, key, LocalDateTime.now());
 
-        boolean exists2 = dmsService.exists(directory, key);
+        boolean exists2 = dms.exists(directory, key);
         assertFalse(exists2);
 
         try {
-            dmsService.softDelete(directory, key);
+            dms.delete(directory, key);
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
         try {
-            dmsService.getTextContent(directory, key);
+            dms.getTextContent(directory, key);
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
         try {
-            dmsService.hardDelete(directory, key);
+            dms.delete(directory, key);
+            dms.purge(directory, key, LocalDateTime.now());
             fail("Should fail");
         } catch (IllegalArgumentException expected) {
         }
@@ -166,52 +194,52 @@ public class DmsTest {
         String directory = "some/directory";
         String key = "some_key";
 
-        dmsService.add(directory, key, content);
-        Collection<String> fileKeys = dmsService.getKeys(directory);
+        dms.add(directory, key, content);
+        Collection<String> fileKeys = dms.getKeys(directory);
         assertEquals(1, fileKeys.size());
         assertTrue(fileKeys.contains(key));
 
-        assertTrue(dmsService.exists(directory, key));
+        assertTrue(dms.exists(directory, key));
 
-        int hardDeleted = dmsService.hardDeleteAllSoftDeleted(directory);
+        int hardDeleted = dms.purge(directory);
         assertEquals(0, hardDeleted);
 
-        assertTrue(dmsService.exists(directory, key));
+        assertTrue(dms.exists(directory, key));
 
-        dmsService.softDelete(directory, key);
-        assertFalse(dmsService.exists(directory, key));
+        dms.delete(directory, key);
+        assertFalse(dms.exists(directory, key));
 
-        dmsService.add(directory, key, content);
-        assertTrue(dmsService.exists(directory, key));
+        dms.add(directory, key, content);
+        assertTrue(dms.exists(directory, key));
 
         LocalDateTime timeBeforeSecondSoftDel = LocalDateTime.now();
         Thread.sleep(Duration.ofSeconds(1));
 
-        dmsService.softDelete(directory, key);
-        assertFalse(dmsService.exists(directory, key));
+        dms.delete(directory, key);
+        assertFalse(dms.exists(directory, key));
 
-        hardDeleted = dmsService.hardDeleteAllSoftDeleted(directory, timeBeforeSecondSoftDel);
+        hardDeleted = dms.purge(directory, timeBeforeSecondSoftDel);
         assertEquals(1, hardDeleted);
 
-        hardDeleted = dmsService.hardDeleteAllSoftDeleted(directory);
+        hardDeleted = dms.purge(directory);
         assertEquals(1, hardDeleted);
 
-        dmsService.add(directory, key, content);
-        assertTrue(dmsService.exists(directory, key));
+        dms.add(directory, key, content);
+        assertTrue(dms.exists(directory, key));
 
-        dmsService.softDelete(directory, key);
-        assertFalse(dmsService.exists(directory, key));
+        dms.delete(directory, key);
+        assertFalse(dms.exists(directory, key));
 
-        dmsService.add(directory, key, content);
-        assertTrue(dmsService.exists(directory, key));
+        dms.add(directory, key, content);
+        assertTrue(dms.exists(directory, key));
 
-        dmsService.softDelete(directory, key);
-        assertFalse(dmsService.exists(directory, key));
+        dms.delete(directory, key);
+        assertFalse(dms.exists(directory, key));
 
-        hardDeleted = dmsService.hardDeleteAllSoftDeleted(directory, timeBeforeSecondSoftDel);
+        hardDeleted = dms.purge(directory, timeBeforeSecondSoftDel);
         assertEquals(0, hardDeleted);
 
-        hardDeleted = dmsService.hardDeleteAllSoftDeleted(directory);
+        hardDeleted = dms.purge(directory);
         assertEquals(2, hardDeleted);
 
     }

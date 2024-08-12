@@ -71,12 +71,12 @@ No transitive dependencies are required during compilation or at runtime.
 <dependency>
     <groupId>com.brinvex.util</groupId>
     <artifactId>brinvex-util-dms-api</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
 </dependency>
 <dependency>
     <groupId>com.brinvex.util</groupId>
     <artifactId>brinvex-util-dms-impl</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <scope>runtime</scope>
 </dependency>
 ````
