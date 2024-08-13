@@ -15,6 +15,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.SequencedCollection;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -114,7 +115,7 @@ public class FilesystemDmsImpl implements Dms {
     }
 
     @Override
-    public Collection<String> getKeys(String directory) {
+    public SequencedCollection<String> getKeys(String directory) {
         validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
         Path directoryPath = workspacePath.resolve(directory);
@@ -128,6 +129,7 @@ public class FilesystemDmsImpl implements Dms {
                     .map(Path::getFileName)
                     .map(Path::toString)
                     .filter(Predicate.not(SoftDeleteHelper::isObsolete))
+                    .sorted()
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to list files at path: %s".formatted(directoryPath), e);

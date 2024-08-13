@@ -4,6 +4,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.SequencedCollection;
 
 /**
  * The {@code DmsService} interface defines the operations for managing documents in a
@@ -16,8 +17,9 @@ public interface Dms {
 
     /**
      * Retrieves all keys within the specified directory.
+     * The returned collection is sorted in ascending order.
      */
-    Collection<String> getKeys(String directory);
+    SequencedCollection<String> getKeys(String directory);
 
     /**
      * Adds a new document under the given key.
