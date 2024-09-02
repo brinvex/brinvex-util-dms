@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.brinvex.util</groupId>
         <artifactId>brinvex-util-dms</artifactId>
-        <version>1.0.7</version>
+        <version>1.0.8</version>
     </parent>
 
     <artifactId>brinvex-util-dms-api</artifactId>
