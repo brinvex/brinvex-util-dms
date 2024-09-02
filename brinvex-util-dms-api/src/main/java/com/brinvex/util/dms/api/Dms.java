@@ -3,7 +3,7 @@ package com.brinvex.util.dms.api;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Collection;
+import java.util.Map;
 import java.util.SequencedCollection;
 
 /**
@@ -62,6 +62,22 @@ public interface Dms {
     boolean put(String directory, String key, byte[] binaryContent);
 
     /**
+     * Stores the {@link Map} object to a file.
+     * If the key does not already exist, the document is added, and the method returns {@code true}.
+     * If the key already exists, the document's content is updated, and the method returns {@code false}.
+     */
+    default boolean put(String directory, String key, Map<String, String> propertiesContent) {
+        return put(directory, key, propertiesContent, DEFAULT_CHARSET);
+    }
+
+    /**
+     * Stores the {@link Map} object to a file.
+     * If the key does not already exist, the document is added, and the method returns {@code true}.
+     * If the key already exists, the document's content is updated, and the method returns {@code false}.
+     */
+    boolean put(String directory, String key, Map<String, String> propertiesContent, Charset charset);
+
+    /**
      * Checks if the specified key exists in the directory.
      */
     boolean exists(String directory, String key);
@@ -82,6 +98,15 @@ public interface Dms {
      * Retrieves the binary content associated with the specified key.
      */
     byte[] getBinaryContent(String directory, String key);
+
+    default Map<String, String> getPropertiesContent(String directory, String key) {
+        return getPropertiesContent(directory, key, DEFAULT_CHARSET);
+    }
+
+    /**
+     * Loads the {@link Map} object from a file associated with the specified key.
+     */
+    Map<String, String> getPropertiesContent(String directory, String key, Charset charset);
 
     /**
      * Soft-deletes the document associated with the given key.

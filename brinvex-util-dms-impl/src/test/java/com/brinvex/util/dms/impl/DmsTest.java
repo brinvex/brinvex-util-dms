@@ -9,11 +9,13 @@ import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,8 +25,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class DmsTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(DmsTest.class);
-
-    private static final DateTimeFormatter workspaceDtf = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
 
     private static DmsFactory dmsFactory;
 
@@ -109,6 +109,41 @@ public class DmsTest {
         purged = dms.purge(directory);
         assertEquals(0, purged);
 
+    }
+
+    @Test
+    void properties() {
+        String directory = "some/directory";
+        String key = "tmp_test.properties";
+
+        boolean added;
+
+        Map<String, String> props1 = Map.of();
+        added = dms.put(directory, key, props1);
+        assertTrue(added);
+
+        Map<String, String> props2 = dms.getPropertiesContent(directory, key);
+        assertEquals(props1, props2);
+        assertEquals(0, props2.size());
+
+        props1 = new LinkedHashMap<>();
+        props1.put("A", LocalDateTime.now().toString());
+        added = dms.put(directory, key, props1, StandardCharsets.ISO_8859_1);
+        assertFalse(added);
+
+        props2 = dms.getPropertiesContent(directory, key);
+        assertEquals(props1, props2);
+        assertEquals(1, props2.size());
+
+        props1 = new LinkedHashMap<>();
+        props1.put("A", LocalDateTime.now().toString());
+        props1.put("B", "1234+ľščščťžŤŘČÁĚ");
+        added = dms.put(directory, key, props1);
+        assertFalse(added);
+
+        props2 = dms.getPropertiesContent(directory, key);
+        assertEquals(props1, props2);
+        assertEquals(2, props2.size());
 
     }
 

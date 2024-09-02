@@ -11,10 +11,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.SequencedCollection;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -173,6 +173,11 @@ public class FilesystemDmsImpl implements Dms {
         return put(directory, key, path -> Files.write(path, binaryContent));
     }
 
+    @Override
+    public boolean put(String directory, String key, Map<String, String> propertiesContent, Charset charset) {
+        return put(directory, key, path -> MapFileUtils.writeMapToFile(propertiesContent, path.toFile(), charset));
+    }
+
     private boolean put(String directory, String key, IOConsumer<Path> fileWriter) {
         validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
@@ -218,6 +223,11 @@ public class FilesystemDmsImpl implements Dms {
     @Override
     public byte[] getBinaryContent(String directory, String key) {
         return getContent(directory, key, Files::readAllBytes);
+    }
+
+    @Override
+    public Map<String, String> getPropertiesContent(String directory, String key, Charset charset) {
+        return getContent(directory, key, path -> MapFileUtils.readMapFromFile(path.toFile(), charset));
     }
 
     private <CONTENT> CONTENT getContent(String directory, String key, IOFunction<Path, CONTENT> fileReader) {
