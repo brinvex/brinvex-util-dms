@@ -221,6 +221,11 @@ public class FilesystemDmsImpl implements Dms {
     }
 
     @Override
+    public List<String> getTextLines(String directory, String key, Charset charset) {
+        return getContent(directory, key, Files::readAllLines);
+    }
+
+    @Override
     public byte[] getBinaryContent(String directory, String key) {
         return getContent(directory, key, Files::readAllBytes);
     }

@@ -3,6 +3,7 @@ package com.brinvex.util.dms.api;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
 
@@ -92,6 +93,18 @@ public interface Dms {
      */
     default String getTextContent(String directory, String key) {
         return getTextContent(directory, key, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Retrieves the text lines associated with the specified key and charset.
+     */
+    List<String> getTextLines(String directory, String key, Charset charset);
+
+    /**
+     * Retrieves the text lines associated with the specified key using the default charset (UTF-8).
+     */
+    default List<String> getTextLines(String directory, String key) {
+        return getTextLines(directory, key, StandardCharsets.UTF_8);
     }
 
     /**

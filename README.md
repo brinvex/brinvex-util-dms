@@ -58,7 +58,10 @@ System.out.println("Deleted " + deletedCount + " soft-deleted documents.");
 To use _Brinvex-Util-DMS_ in your Maven project, declare the following dependency in your project's pom file. 
 No transitive dependencies are required during compilation or at runtime.
 ````
-
+<properties>
+     <brinvex-util-dms.version>1.0.10</brinvex-util-dms.version>
+</properties>
+    
 <repository>
     <id>repository.brinvex</id>
     <name>Brinvex Repository</name>
@@ -71,12 +74,12 @@ No transitive dependencies are required during compilation or at runtime.
 <dependency>
     <groupId>com.brinvex.util</groupId>
     <artifactId>brinvex-util-dms-api</artifactId>
-    <version>1.0.7</version>
+    <version>${brinvex-util-dms.version}</version>
 </dependency>
 <dependency>
     <groupId>com.brinvex.util</groupId>
     <artifactId>brinvex-util-dms-impl</artifactId>
-    <version>1.0.7</version>
+    <version>${brinvex-util-dms.version}</version>
     <scope>runtime</scope>
 </dependency>
 ````
