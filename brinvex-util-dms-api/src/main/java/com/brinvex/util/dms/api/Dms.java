@@ -2,10 +2,13 @@ package com.brinvex.util.dms.api;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * The {@code DmsService} interface defines the operations for managing documents in a
@@ -77,6 +80,27 @@ public interface Dms {
      * If the key already exists, the document's content is updated, and the method returns {@code false}.
      */
     boolean put(String directory, String key, Map<String, String> propertiesContent, Charset charset);
+
+    default <KEY> boolean putPeriodContentIfNotRedundant(
+            String directory,
+            String key,
+            String textContent,
+            BiFunction<String, String, KEY> keyFnc,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc
+    ) {
+        return putPeriodContentIfNotRedundant(directory, key, textContent, keyFnc, keyStartDateInclFnc, keyEndDateInclFnc, DEFAULT_CHARSET);
+    }
+
+    <KEY> boolean putPeriodContentIfNotRedundant(
+            String directory,
+            String key,
+            String textContent,
+            BiFunction<String, String, KEY> keyFnc,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc,
+            Charset charset
+    );
 
     /**
      * Checks if the specified key exists in the directory.

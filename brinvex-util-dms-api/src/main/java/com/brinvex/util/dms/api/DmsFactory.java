@@ -7,13 +7,19 @@ public interface DmsFactory {
 
     Dms getDms(String workspace);
 
-    static DmsFactory createFilesystemDmsFactory(Path basePath) {
+    static DmsFactory newFilesystemDmsFactory(Path basePath) {
+        String factoryImplClassName = "com.brinvex.util.dms.impl.FilesystemDmsFactoryImpl";
         try {
-            return (DmsFactory) Class.forName("com.brinvex.util.dms.impl.FilesystemDmsFactoryImpl")
+            return (DmsFactory) Class.forName(factoryImplClassName)
                     .getConstructor(Path.class)
                     .newInstance(basePath);
-        } catch (ClassNotFoundException | NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(e);
+        } catch (ClassNotFoundException
+                 | IllegalAccessException
+                 | InstantiationException
+                 | NoSuchMethodException
+                 | InvocationTargetException e
+        ) {
+            throw new IllegalStateException("Failed to instantiate %s, basePath=%s, %s".formatted(factoryImplClassName, basePath, e), e);
         }
     }
 }

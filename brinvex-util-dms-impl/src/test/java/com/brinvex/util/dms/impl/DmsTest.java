@@ -33,7 +33,7 @@ public class DmsTest {
     @BeforeAll
     static void beforeAll() {
         Path basePath = Path.of("c:/prj/bx-util/bx-util-dms/test-data/");
-        dmsFactory = DmsFactory.createFilesystemDmsFactory(basePath);
+        dmsFactory = DmsFactory.newFilesystemDmsFactory(basePath);
     }
 
     @BeforeEach

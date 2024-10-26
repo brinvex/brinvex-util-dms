@@ -10,7 +10,7 @@ import java.nio.charset.Charset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-class MapFileUtils {
+class KeyValueFileUtils {
 
     /**
      * Writes a Map to a text file. Each entry is written as key=value.

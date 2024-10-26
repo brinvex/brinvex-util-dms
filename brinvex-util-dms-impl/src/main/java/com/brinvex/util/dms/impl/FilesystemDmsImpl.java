@@ -9,17 +9,25 @@ import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings("DuplicatedCode")
 public class FilesystemDmsImpl implements Dms {
@@ -175,7 +183,50 @@ public class FilesystemDmsImpl implements Dms {
 
     @Override
     public boolean put(String directory, String key, Map<String, String> propertiesContent, Charset charset) {
-        return put(directory, key, path -> MapFileUtils.writeMapToFile(propertiesContent, path.toFile(), charset));
+        return put(directory, key, path -> KeyValueFileUtils.writeMapToFile(propertiesContent, path.toFile(), charset));
+    }
+
+    @Override
+    public <KEY> boolean putPeriodContentIfNotRedundant(
+            String directory,
+            String key,
+            String textContent,
+            BiFunction<String, String, KEY> keyFnc,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc,
+            Charset charset
+    ) {
+        SequencedCollection<String> oldRawKeys = getKeys(directory);
+        if (oldRawKeys.isEmpty()) {
+            add(directory, key, textContent, charset);
+            return true;
+        }
+        Map<KEY, String> oldKeys = oldRawKeys.stream().collect(toMap(rawKey -> keyFnc.apply(directory, rawKey), identity()));
+        {
+            int oldRawKeysSize = oldRawKeys.size();
+            int oldKeysSize = oldKeys.size();
+            if (oldRawKeysSize != oldKeysSize) {
+                throw new IllegalStateException("keyFnc must produce unique keys, oldRawKeysSize=%s, oldKeysSize=%s".formatted(oldRawKeysSize, oldKeysSize));
+            }
+        }
+        KEY newKey = keyFnc.apply(directory, key);
+
+        List<KEY> oldAndNewKeys = new ArrayList<>(oldKeys.keySet());
+        oldAndNewKeys.add(newKey);
+
+        Set<KEY> uselessKeys = PeriodDocUtils.findRedundantKeys(oldAndNewKeys, keyStartDateInclFnc, keyEndDateInclFnc);
+        boolean newSaved;
+        if (!uselessKeys.remove(newKey)) {
+            add(directory, key, textContent, charset);
+            newSaved = true;
+            for (KEY uselessKey : uselessKeys) {
+                String uselessRawKey = oldKeys.get(uselessKey);
+                delete(directory, uselessRawKey);
+            }
+        } else {
+            newSaved = false;
+        }
+        return newSaved;
     }
 
     private boolean put(String directory, String key, IOConsumer<Path> fileWriter) {
@@ -232,7 +283,7 @@ public class FilesystemDmsImpl implements Dms {
 
     @Override
     public Map<String, String> getPropertiesContent(String directory, String key, Charset charset) {
-        return getContent(directory, key, path -> MapFileUtils.readMapFromFile(path.toFile(), charset));
+        return getContent(directory, key, path -> KeyValueFileUtils.readMapFromFile(path.toFile(), charset));
     }
 
     private <CONTENT> CONTENT getContent(String directory, String key, IOFunction<Path, CONTENT> fileReader) {
