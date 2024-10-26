@@ -48,7 +48,7 @@ class PeriodDocUtils {
                                          && !keyEndDateInclFnc.apply(midKey).isAfter(keyEndDateInclFnc.apply(prevKey));
                     boolean insideNext = !keyStartDateInclFnc.apply(midKey).isBefore(keyStartDateInclFnc.apply(nextKey))
                                          && !keyEndDateInclFnc.apply(midKey).isAfter(keyEndDateInclFnc.apply(nextKey));
-                    useful = !insidePrev || !insideNext;
+                    useful = !insidePrev && !insideNext;
                 }
             }
             if (!useful) {

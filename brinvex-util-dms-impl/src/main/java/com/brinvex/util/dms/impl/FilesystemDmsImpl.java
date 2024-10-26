@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
@@ -201,12 +202,13 @@ public class FilesystemDmsImpl implements Dms {
             add(directory, key, textContent, charset);
             return true;
         }
-        Map<KEY, String> oldKeys = oldRawKeys.stream().collect(toMap(rawKey -> keyFnc.apply(directory, rawKey), identity()));
-        {
-            int oldRawKeysSize = oldRawKeys.size();
-            int oldKeysSize = oldKeys.size();
-            if (oldRawKeysSize != oldKeysSize) {
-                throw new IllegalStateException("keyFnc must produce unique keys, oldRawKeysSize=%s, oldKeysSize=%s".formatted(oldRawKeysSize, oldKeysSize));
+        Map<KEY, String> oldKeys = new HashMap<>();
+        for (String oldRawKey : oldRawKeys) {
+            KEY oldKey = keyFnc.apply(directory, oldRawKey);
+            if (oldKey != null) {
+                if (oldKeys.put(oldKey, oldRawKey) != null) {
+                    throw new IllegalStateException("Duplicate key: %s, %s".formatted(oldRawKey, oldKey));
+                }
             }
         }
         KEY newKey = keyFnc.apply(directory, key);
