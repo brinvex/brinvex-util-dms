@@ -85,7 +85,7 @@ public interface Dms {
             String directory,
             String key,
             String textContent,
-            BiFunction<String, String, KEY> keyFnc,
+            Function<String, KEY> keyFnc,
             Function<KEY, LocalDate> keyStartDateInclFnc,
             Function<KEY, LocalDate> keyEndDateInclFnc
     ) {
@@ -96,7 +96,7 @@ public interface Dms {
             String directory,
             String key,
             String textContent,
-            BiFunction<String, String, KEY> keyFnc,
+            Function<String, KEY> keyFnc,
             Function<KEY, LocalDate> keyStartDateInclFnc,
             Function<KEY, LocalDate> keyEndDateInclFnc,
             Charset charset

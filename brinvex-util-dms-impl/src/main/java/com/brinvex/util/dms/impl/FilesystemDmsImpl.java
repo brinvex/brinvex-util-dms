@@ -20,15 +20,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
 
 @SuppressWarnings("DuplicatedCode")
 public class FilesystemDmsImpl implements Dms {
@@ -192,7 +188,7 @@ public class FilesystemDmsImpl implements Dms {
             String directory,
             String key,
             String textContent,
-            BiFunction<String, String, KEY> keyFnc,
+            Function<String, KEY> keyFnc,
             Function<KEY, LocalDate> keyStartDateInclFnc,
             Function<KEY, LocalDate> keyEndDateInclFnc,
             Charset charset
@@ -204,14 +200,14 @@ public class FilesystemDmsImpl implements Dms {
         }
         Map<KEY, String> oldKeys = new HashMap<>();
         for (String oldRawKey : oldRawKeys) {
-            KEY oldKey = keyFnc.apply(directory, oldRawKey);
+            KEY oldKey = keyFnc.apply(oldRawKey);
             if (oldKey != null) {
                 if (oldKeys.put(oldKey, oldRawKey) != null) {
                     throw new IllegalStateException("Duplicate key: %s, %s".formatted(oldRawKey, oldKey));
                 }
             }
         }
-        KEY newKey = keyFnc.apply(directory, key);
+        KEY newKey = keyFnc.apply(key);
 
         List<KEY> oldAndNewKeys = new ArrayList<>(oldKeys.keySet());
         oldAndNewKeys.add(newKey);
