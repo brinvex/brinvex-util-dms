@@ -2,23 +2,23 @@ package com.brinvex.util.dms.impl;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.SequencedSet;
 import java.util.function.Function;
 
-import static java.util.Collections.emptySet;
+import static java.util.Collections.emptySortedSet;
 import static java.util.Comparator.comparing;
 
 class PeriodDocUtils {
 
-    public static <KEY> Set<KEY> findRedundantKeys(Collection<KEY> keys, Function<KEY, LocalDate> keyStartDateInclFnc, Function<KEY, LocalDate> keyEndDateInclFnc) {
+    public static <KEY> SequencedSet<KEY> findRedundantKeys(Collection<KEY> keys, Function<KEY, LocalDate> keyStartDateInclFnc, Function<KEY, LocalDate> keyEndDateInclFnc) {
         int size = keys.size();
         if (size <= 1) {
-            return emptySet();
+            return emptySortedSet();
         }
         List<KEY> sortedKeys = keys.stream().sorted(comparing(keyStartDateInclFnc).thenComparing(keyEndDateInclFnc)).toList();
-        Set<KEY> uselessKeys = new HashSet<>();
+        SequencedSet<KEY> uselessKeys = new LinkedHashSet<>();
         int prevUsefulIndex = 0;
         for (int i = 0; i < size; i++) {
             KEY midKey = sortedKeys.get(i);

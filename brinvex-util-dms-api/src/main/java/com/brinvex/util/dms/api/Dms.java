@@ -4,10 +4,12 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
-import java.util.function.BiFunction;
+import java.util.SequencedMap;
+import java.util.SequencedSet;
 import java.util.function.Function;
 
 /**
@@ -81,27 +83,6 @@ public interface Dms {
      */
     boolean put(String directory, String key, Map<String, String> propertiesContent, Charset charset);
 
-    default <KEY> boolean putPeriodContentIfNotRedundant(
-            String directory,
-            String key,
-            String textContent,
-            Function<String, KEY> keyFnc,
-            Function<KEY, LocalDate> keyStartDateInclFnc,
-            Function<KEY, LocalDate> keyEndDateInclFnc
-    ) {
-        return putPeriodContentIfNotRedundant(directory, key, textContent, keyFnc, keyStartDateInclFnc, keyEndDateInclFnc, DEFAULT_CHARSET);
-    }
-
-    <KEY> boolean putPeriodContentIfNotRedundant(
-            String directory,
-            String key,
-            String textContent,
-            Function<String, KEY> keyFnc,
-            Function<KEY, LocalDate> keyStartDateInclFnc,
-            Function<KEY, LocalDate> keyEndDateInclFnc,
-            Charset charset
-    );
-
     /**
      * Checks if the specified key exists in the directory.
      */
@@ -149,6 +130,24 @@ public interface Dms {
      * Soft-deletes the document associated with the given key.
      */
     void delete(String directory, String key);
+
+    /**
+     * Soft-deletes the documents associated with the given keys.
+     */
+    void delete(String directory, Collection<String> keys);
+
+    <KEY> SequencedMap<KEY, String> getRedundantPeriodKeys(
+            String directory,
+            Function<String, KEY> keyFnc,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc
+    );
+
+    <KEY> SequencedSet<KEY> getRedundantPeriodKeys(
+            Collection<KEY> keys,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc
+    );
 
     /**
      * Permanently hard-deletes all obsolete(deleted or overridden) documents matching the given criteria.

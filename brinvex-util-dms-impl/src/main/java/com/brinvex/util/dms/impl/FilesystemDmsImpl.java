@@ -12,13 +12,15 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SequencedCollection;
+import java.util.SequencedMap;
+import java.util.SequencedSet;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -183,50 +185,6 @@ public class FilesystemDmsImpl implements Dms {
         return put(directory, key, path -> KeyValueFileUtils.writeMapToFile(propertiesContent, path.toFile(), charset));
     }
 
-    @Override
-    public <KEY> boolean putPeriodContentIfNotRedundant(
-            String directory,
-            String key,
-            String textContent,
-            Function<String, KEY> keyFnc,
-            Function<KEY, LocalDate> keyStartDateInclFnc,
-            Function<KEY, LocalDate> keyEndDateInclFnc,
-            Charset charset
-    ) {
-        SequencedCollection<String> oldRawKeys = getKeys(directory);
-        if (oldRawKeys.isEmpty()) {
-            add(directory, key, textContent, charset);
-            return true;
-        }
-        Map<KEY, String> oldKeys = new HashMap<>();
-        for (String oldRawKey : oldRawKeys) {
-            KEY oldKey = keyFnc.apply(oldRawKey);
-            if (oldKey != null) {
-                if (oldKeys.put(oldKey, oldRawKey) != null) {
-                    throw new IllegalStateException("Duplicate key: %s, %s".formatted(oldRawKey, oldKey));
-                }
-            }
-        }
-        KEY newKey = keyFnc.apply(key);
-
-        List<KEY> oldAndNewKeys = new ArrayList<>(oldKeys.keySet());
-        oldAndNewKeys.add(newKey);
-
-        Set<KEY> uselessKeys = PeriodDocUtils.findRedundantKeys(oldAndNewKeys, keyStartDateInclFnc, keyEndDateInclFnc);
-        boolean newSaved;
-        if (!uselessKeys.remove(newKey)) {
-            add(directory, key, textContent, charset);
-            newSaved = true;
-            for (KEY uselessKey : uselessKeys) {
-                String uselessRawKey = oldKeys.get(uselessKey);
-                delete(directory, uselessRawKey);
-            }
-        } else {
-            newSaved = false;
-        }
-        return newSaved;
-    }
-
     private boolean put(String directory, String key, IOConsumer<Path> fileWriter) {
         validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
@@ -301,20 +259,62 @@ public class FilesystemDmsImpl implements Dms {
 
     @Override
     public void delete(String directory, String key) {
+        delete(directory, Set.of(key));
+    }
+
+    @Override
+    public void delete(String directory, Collection<String> keys) {
         validateWorkspaceNotDeleted();
         validateDirectorySyntax(directory);
-        validateKeySyntax(key);
-        Path filePath = workspacePath.resolve(directory).resolve(key);
-        if (!Files.exists(filePath)) {
-            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'"
-                    .formatted(workspace, directory, key));
+        for (String key : keys) {
+            validateKeySyntax(key);
         }
-        Path newSoftDelPath = SoftDeleteHelper.contructSoftDeletedPath(filePath, LocalDateTime.now());
-        try {
-            Files.move(filePath, newSoftDelPath);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to move %s -> %s".formatted(filePath, newSoftDelPath), e);
+        for (String key : keys) {
+            Path filePath = workspacePath.resolve(directory).resolve(key);
+            if (!Files.exists(filePath)) {
+                throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'"
+                        .formatted(workspace, directory, key));
+            }
+            Path newSoftDelPath = SoftDeleteHelper.contructSoftDeletedPath(filePath, LocalDateTime.now());
+            try {
+                Files.move(filePath, newSoftDelPath);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to move %s -> %s".formatted(filePath, newSoftDelPath), e);
+            }
         }
+    }
+
+    @Override
+    public <KEY> SequencedMap<KEY, String> getRedundantPeriodKeys(
+            String directory,
+            Function<String, KEY> keyFnc,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc) {
+        SequencedCollection<String> rawKeys = getKeys(directory);
+        if (rawKeys.isEmpty()) {
+            return Collections.emptySortedMap();
+        }
+        SequencedMap<KEY, String> keys = new LinkedHashMap<>();
+        for (String rawKey : rawKeys) {
+            KEY key = keyFnc.apply(rawKey);
+            if (key != null) {
+                if (keys.put(key, rawKey) != null) {
+                    throw new IllegalStateException("Duplicate key: %s, %s".formatted(rawKey, key));
+                }
+            }
+        }
+        SequencedSet<KEY> redundantKeys = getRedundantPeriodKeys(keys.keySet(), keyStartDateInclFnc, keyEndDateInclFnc);
+        keys.keySet().retainAll(redundantKeys);
+        return keys;
+    }
+
+    @Override
+    public <KEY> SequencedSet<KEY> getRedundantPeriodKeys(
+            Collection<KEY> keys,
+            Function<KEY, LocalDate> keyStartDateInclFnc,
+            Function<KEY, LocalDate> keyEndDateInclFnc
+    ) {
+        return PeriodDocUtils.findRedundantKeys(keys, keyStartDateInclFnc, keyEndDateInclFnc);
     }
 
     @Override
