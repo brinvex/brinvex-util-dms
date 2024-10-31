@@ -6,12 +6,14 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -27,6 +29,8 @@ import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
 
 @SuppressWarnings("DuplicatedCode")
 public class FilesystemDmsImpl implements Dms {
@@ -224,12 +228,55 @@ public class FilesystemDmsImpl implements Dms {
 
     @Override
     public String getTextContent(String directory, String key, Charset charset) {
-        return getContent(directory, key, Files::readString);
+        return getContent(directory, key, path -> Files.readString(path, charset));
+    }
+
+    @Override
+    public String getTextContent(String directory, String key, Charset charset, Charset alternativeCharset) {
+        return getContent(directory, key, path -> {
+
+            List<Charset> charsets = new ArrayList<>();
+            charsets.add(requireNonNull(charset));
+            if (alternativeCharset != null) {
+                charsets.add(alternativeCharset);
+            }
+
+            List<CharacterCodingException> characterCodingExceptions = new ArrayList<>();
+            try {
+                for (Charset chs : charsets) {
+                    try {
+                        return Files.readString(path, chs);
+                    } catch (Throwable throwable) {
+                        if (throwable instanceof CharacterCodingException characterCodingException) {
+                            characterCodingExceptions.add(characterCodingException);
+                        } else {
+                            Throwable cause = throwable.getCause();
+                            if (cause instanceof CharacterCodingException characterCodingCause) {
+                                characterCodingExceptions.add(characterCodingCause);
+                            } else {
+                                throw throwable;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+                for (Exception charsetException : characterCodingExceptions) {
+                    e.addSuppressed(charsetException);
+                }
+                throw e;
+            }
+
+            IOException newestException = characterCodingExceptions.removeLast();
+            for (Exception charsetException : characterCodingExceptions) {
+                newestException.addSuppressed(charsetException);
+            }
+            throw newestException;
+        });
     }
 
     @Override
     public List<String> getTextLines(String directory, String key, Charset charset) {
-        return getContent(directory, key, Files::readAllLines);
+        return getContent(directory, key, path -> Files.readAllLines(path, charset));
     }
 
     @Override

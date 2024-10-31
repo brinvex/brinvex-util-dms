@@ -93,6 +93,8 @@ public interface Dms {
      */
     String getTextContent(String directory, String key, Charset charset);
 
+    String getTextContent(String directory, String key, Charset charset, Charset alternativeCharset);
+
     /**
      * Retrieves the text content associated with the specified key using the default charset (UTF-8).
      */
