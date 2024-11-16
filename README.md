@@ -59,7 +59,7 @@ To use _Brinvex-Util-DMS_ in your Maven project, declare the following dependenc
 No transitive dependencies are required during compilation or at runtime.
 ````
 <properties>
-     <brinvex-util-dms.version>1.0.17</brinvex-util-dms.version>
+     <brinvex-util-dms.version>1.0.18</brinvex-util-dms.version>
 </properties>
     
 <repository>

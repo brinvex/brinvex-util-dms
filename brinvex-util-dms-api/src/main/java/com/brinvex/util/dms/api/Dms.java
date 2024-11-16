@@ -1,7 +1,6 @@
 package com.brinvex.util.dms.api;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -12,6 +11,8 @@ import java.util.SequencedMap;
 import java.util.SequencedSet;
 import java.util.function.Function;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * The {@code DmsService} interface defines the operations for managing documents in a
  * Document Management System (DMS). This includes storing, retrieving, and deleting
@@ -19,7 +20,7 @@ import java.util.function.Function;
  */
 public interface Dms {
 
-    Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    Charset DEFAULT_CHARSET = UTF_8;
 
     /**
      * Retrieves all keys within the specified directory.
@@ -32,7 +33,7 @@ public interface Dms {
      * If a document with the given key already exists, this method will throw an exception.
      */
     default void add(String directory, String key, String textContent) {
-        add(directory, key, textContent, StandardCharsets.UTF_8);
+        add(directory, key, textContent, UTF_8);
     }
 
     /**
@@ -99,7 +100,7 @@ public interface Dms {
      * Retrieves the text content associated with the specified key using the default charset (UTF-8).
      */
     default String getTextContent(String directory, String key) {
-        return getTextContent(directory, key, StandardCharsets.UTF_8);
+        return getTextContent(directory, key, UTF_8);
     }
 
     /**
@@ -111,7 +112,13 @@ public interface Dms {
      * Retrieves the text lines associated with the specified key using the default charset (UTF-8).
      */
     default List<String> getTextLines(String directory, String key) {
-        return getTextLines(directory, key, StandardCharsets.UTF_8);
+        return getTextLines(directory, key, UTF_8);
+    }
+
+    List<String> getTextLines(String directory, String key, int limit, Charset charset);
+
+    default List<String> getTextLines(String directory, String key, int limit) {
+        return getTextLines(directory, key, limit, UTF_8);
     }
 
     /**

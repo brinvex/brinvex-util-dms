@@ -280,6 +280,15 @@ public class FilesystemDmsImpl implements Dms {
     }
 
     @Override
+    public List<String> getTextLines(String directory, String key, int limit, Charset charset) {
+        return getContent(directory, key, path -> {
+            try (Stream<String> lines = Files.lines(path, charset)) {
+                return lines.limit(limit).toList();
+            }
+        });
+    }
+
+    @Override
     public byte[] getBinaryContent(String directory, String key) {
         return getContent(directory, key, Files::readAllBytes);
     }
