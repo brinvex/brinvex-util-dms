@@ -289,6 +289,49 @@ public class FilesystemDmsImpl implements Dms {
     }
 
     @Override
+    public List<String> getTextLines(String directory, String key, int limit, Charset charset, Charset alternativeCharset) {
+        return getContent(directory, key, path -> {
+
+            List<Charset> charsets = new ArrayList<>();
+            charsets.add(requireNonNull(charset));
+            if (alternativeCharset != null) {
+                charsets.add(alternativeCharset);
+            }
+
+            List<CharacterCodingException> characterCodingExceptions = new ArrayList<>();
+            try {
+                for (Charset chs : charsets) {
+                    try (Stream<String> lines = Files.lines(path, chs)) {
+                        return lines.limit(limit).toList();
+                    } catch (Throwable throwable) {
+                        if (throwable instanceof CharacterCodingException characterCodingException) {
+                            characterCodingExceptions.add(characterCodingException);
+                        } else {
+                            Throwable cause = throwable.getCause();
+                            if (cause instanceof CharacterCodingException characterCodingCause) {
+                                characterCodingExceptions.add(characterCodingCause);
+                            } else {
+                                throw throwable;
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+                for (Exception charsetException : characterCodingExceptions) {
+                    e.addSuppressed(charsetException);
+                }
+                throw e;
+            }
+
+            IOException newestException = characterCodingExceptions.removeLast();
+            for (Exception charsetException : characterCodingExceptions) {
+                newestException.addSuppressed(charsetException);
+            }
+            throw newestException;
+        });
+    }
+
+    @Override
     public byte[] getBinaryContent(String directory, String key) {
         return getContent(directory, key, Files::readAllBytes);
     }

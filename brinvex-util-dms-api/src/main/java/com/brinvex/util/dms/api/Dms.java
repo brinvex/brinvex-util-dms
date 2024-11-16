@@ -121,6 +121,8 @@ public interface Dms {
         return getTextLines(directory, key, limit, UTF_8);
     }
 
+    List<String> getTextLines(String directory, String key, int limit, Charset charset, Charset alternativeCharset);
+
     /**
      * Retrieves the binary content associated with the specified key.
      */
