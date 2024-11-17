@@ -10,8 +10,10 @@ import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -339,6 +341,23 @@ public class FilesystemDmsImpl implements Dms {
     @Override
     public Map<String, String> getPropertiesContent(String directory, String key, Charset charset) {
         return getContent(directory, key, path -> KeyValueFileUtils.readMapFromFile(path.toFile(), charset));
+    }
+
+    @Override
+    public LocalDateTime getLastModifiedTime(String directory, String key) {
+        validateWorkspaceNotDeleted();
+        validateDirectorySyntax(directory);
+        validateKeySyntax(key);
+        Path filePath = workspacePath.resolve(directory).resolve(key);
+        if (!Files.exists(filePath)) {
+            throw new IllegalArgumentException("Document doesn't exist: workspace='%s', directory='%s', key='%s'".formatted(workspace, directory, key));
+        }
+        try {
+            FileTime ft = Files.getLastModifiedTime(filePath);
+            return LocalDateTime.ofInstant(ft.toInstant(), ZoneId.systemDefault());
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to get the last modified time %s".formatted(filePath), e);
+        }
     }
 
     private <CONTENT> CONTENT getContent(String directory, String key, IOFunction<Path, CONTENT> fileReader) {

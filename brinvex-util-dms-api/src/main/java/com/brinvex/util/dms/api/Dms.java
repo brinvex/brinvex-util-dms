@@ -137,6 +137,8 @@ public interface Dms {
      */
     Map<String, String> getPropertiesContent(String directory, String key, Charset charset);
 
+    LocalDateTime getLastModifiedTime(String directory, String key);
+
     /**
      * Soft-deletes the document associated with the given key.
      */
